@@ -1,5 +1,40 @@
 local actionhandlers = {};
+local simplelog_recent_actions = {};
+local simplelog_dedupe_window = 1.0;
 
+local function ShouldSkipDuplicateAction(act, target, action, kind)
+    local now = os.clock();
+
+    local key = table.concat({
+        tostring(kind or 'main'),
+        tostring(act.actor_id),
+        tostring(act.category),
+        tostring(act.param),
+        tostring(act.action and act.action.id or ''),
+        tostring(act.action and act.action.weapon_skill or ''),
+        tostring(target and target.server_id or ''),
+        tostring(action.message or 0),
+        tostring(action.param or 0),
+        tostring(action.add_effect_message or 0),
+        tostring(action.add_effect_param or 0),
+        tostring(action.spike_effect_message or 0),
+        tostring(action.spike_effect_param or 0),
+    }, '|');
+
+    if simplelog_recent_actions[key] and (now - simplelog_recent_actions[key]) < simplelog_dedupe_window then
+        return true;
+    end
+
+    simplelog_recent_actions[key] = now;
+
+    for k, v in pairs(simplelog_recent_actions) do
+        if (now - v) > 5 then
+            simplelog_recent_actions[k] = nil;
+        end
+    end
+
+    return false;
+end
 
 
 actionhandlers.parse_action_packet = function(act)
@@ -24,7 +59,7 @@ actionhandlers.parse_action_packet = function(act)
     targets_condensed = false
 
     if not act.action then
-        print(chat.header('SimpleLogDebug') .. chat.message('No Action MSG'))
+        -- print(chat.header('SimpleLogDebug') .. chat.message('No Action MSG'))
         return act
     end
 
@@ -390,11 +425,13 @@ actionhandlers.parse_action_packet = function(act)
                 :gsub('${number}',(act.action.number or m.param)..roll)
                 :gsub('${status}',m.status or 'ERROR 120')
                 :gsub('${gil}',m.param..' gil'), m.message))
-                if m.message == 377 and act.actor_id == Self.ServerId then
-                    gFuncs.SendDelayedMessage:bind1(color):bind1(message):once(0.5)
-                else
-                    AshitaCore:GetChatManager():AddChatMessage(color, false, message)
-                end
+				if not ShouldSkipDuplicateAction(act, v.target[1], m, 'main') then
+					if m.message == 377 and act.actor_id == Self.ServerId then
+						gFuncs.SendDelayedMessage:bind1(color):bind1(message):once(0.5)
+					else
+						AshitaCore:GetChatManager():AddChatMessage(color, false, message)
+					end
+				end
                 if not non_block_messages:contains(m.message) then
                     m.message = 0
                 end
@@ -431,28 +468,41 @@ actionhandlers.parse_action_packet = function(act)
                         msg = gFuncs.PluralTarget(msg, m.add_effect_message)
                     end
                 end
-                if m.add_effect_fields.status then numb = m.add_effect_status else numb = gActionHandlers.PrefSuf((m.cadd_effect_param or m.add_effect_param), m.add_effect_message, act.actor.damage, col) end
-                if not act.action then
-                    --AshitaCore:GetChatManager():AddChatMessage(color, false, 'act.action==nil : '..m.message..' - '..m.add_effect_message..' - '..msg)
-                else
-                    AshitaCore:GetChatManager():AddChatMessage(color, false, gActionHandlers.MakeCondesedamageNumber(m.add_effect_number)..(gFuncs.CleanMsg(msg
-                    :gsub('${spell}',act.action.spell or 'ERROR 127')
-                    :gsub('${ability}',act.action.ability or 'ERROR 128')
-                    :gsub('${item}',act.action.item or 'ERROR 129')
-                    :gsub('${weapon_skill}',act.action.weapon_skill or 'ERROR 130')
-                    :gsub('${abil}',m.simp_add_name or act.action.name or 'ERROR 131')
-                    :gsub('${numb}',numb or 'ERROR 132')
-                    :gsub('${actor}\'s',gFuncs.ColorIt(act.actor.name,gProfileColor[act.actor.owner or act.actor.type])..'\'s'..act.actor.owner_name)
-                    :gsub('${actor}',gFuncs.ColorIt(act.actor.name,gProfileColor[act.actor.owner or act.actor.type])..act.actor.owner_name)
-                    :gsub('${target}\'s',targ)
-                    :gsub('${target}',targ)
-                    :gsub('${lb}','\7')
-                    :gsub('${number}',m.add_effect_param)
-                    :gsub('${status}',m.add_effect_status or 'ERROR 178'), m.add_effect_message)))
-                    if not non_block_messages:contains(m.add_effect_message) then
-                        m.add_effect_message = 0
-                    end
-                end
+				if m.add_effect_fields.status then
+					numb = m.add_effect_status
+				else
+					numb = gActionHandlers.PrefSuf((m.cadd_effect_param or m.add_effect_param), m.add_effect_message, act.actor.damage, col)
+				end
+
+				if not act.action then
+					--AshitaCore:GetChatManager():AddChatMessage(color, false, 'act.action==nil : '..m.message..' - '..m.add_effect_message..' - '..msg)
+				else
+				local add_effect_message = gActionHandlers.MakeCondesedamageNumber(m.add_effect_number) .. gFuncs.CleanMsg(
+					msg
+						:gsub('${spell}', act.action.spell or 'ERROR 127')
+						:gsub('${ability}', act.action.ability or 'ERROR 128')
+						:gsub('${item}', act.action.item or 'ERROR 129')
+						:gsub('${weapon_skill}', act.action.weapon_skill or 'ERROR 130')
+						:gsub('${abil}', m.simp_add_name or act.action.name or 'ERROR 131')
+						:gsub('${numb}', numb or 'ERROR 132')
+						:gsub('${actor}\'s', gFuncs.ColorIt(act.actor.name, gProfileColor[act.actor.owner or act.actor.type]) .. '\'s' .. act.actor.owner_name)
+						:gsub('${actor}', gFuncs.ColorIt(act.actor.name, gProfileColor[act.actor.owner or act.actor.type]) .. act.actor.owner_name)
+						:gsub('${target}\'s', targ)
+						:gsub('${target}', targ)
+						:gsub('${lb}', '\7')
+						:gsub('${number}', m.add_effect_param)
+						:gsub('${status}', m.add_effect_status or 'ERROR 178'),
+					m.add_effect_message
+				)
+
+					if not ShouldSkipDuplicateAction(act, v.target[1], m, 'add') then
+						AshitaCore:GetChatManager():AddChatMessage(color, false, add_effect_message)
+					end
+
+					if not non_block_messages:contains(m.add_effect_message) then
+						m.add_effect_message = 0
+					end
+				end
             end
             if m.has_spike_effect and m.spike_effect_message ~= 0 and spike_effect_valid[act.category] then
                 local targ = gActionHandlers.AssembleTargets(act.actor, v.target, act.category, m.spike_effect_message, m.has_spike_effect)
@@ -495,24 +545,37 @@ actionhandlers.parse_action_packet = function(act)
                         msg = gFuncs.PluralTarget(msg, m.spike_effect_message)
                     end
                 end
-                if m.spike_effect_fields.status then numb = m.spike_effect_status else numb = gActionHandlers.PrefSuf((m.cspike_effect_param or m.spike_effect_param), m.spike_effect_message, actor.damage, col) end
-                AshitaCore:GetChatManager():AddChatMessage(color, false, gActionHandlers.MakeCondesedamageNumber(m.spike_effect_number)..(gFuncs.CleanMsg(msg
-                :gsub('${spell}',act.action.spell or 'ERROR 142')
-                :gsub('${ability}',act.action.ability or 'ERROR 143')
-                :gsub('${item}',act.action.item or 'ERROR 144')
-                :gsub('${weapon_skill}',act.action.weapon_skill or 'ERROR 145')
-                :gsub('${abil}',m.simp_spike_name or act.action.name or 'ERROR 146')
-                :gsub('${numb}',numb or 'ERROR 147')
-                :gsub('${actor}\'s',gFuncs.ColorIt(act.actor.name,gProfileColor[act.actor.owner or act.actor.type])..'\'s'..act.actor.owner_name)
-                :gsub((gProfileSettings.mode.simplify and '${target}' or '${actor}'),gFuncs.ColorIt(act.actor.name,gProfileColor[act.actor.owner or act.actor.type])..act.actor.owner_name)
-                :gsub('${target}\'s',targ)
-                :gsub((gProfileSettings.mode.simplify and '${actor}' or '${target}'),targ)
-                :gsub('${lb}','\7')
-                :gsub('${number}',m.spike_effect_param)
-                :gsub('${status}',m.spike_effect_status or 'ERROR 150'), m.spike_effect_message)))
-                if not non_block_messages:contains(m.spike_effect_message) then
-                    m.spike_effect_message = 0
-                end
+				if m.spike_effect_fields.status then
+					numb = m.spike_effect_status
+				else
+					numb = gActionHandlers.PrefSuf((m.cspike_effect_param or m.spike_effect_param), m.spike_effect_message, actor.damage, col)
+				end
+
+				local spike_effect_message = gActionHandlers.MakeCondesedamageNumber(m.spike_effect_number) .. gFuncs.CleanMsg(
+					msg
+						:gsub('${spell}', act.action.spell or 'ERROR 142')
+						:gsub('${ability}', act.action.ability or 'ERROR 143')
+						:gsub('${item}', act.action.item or 'ERROR 144')
+						:gsub('${weapon_skill}', act.action.weapon_skill or 'ERROR 145')
+						:gsub('${abil}', m.simp_spike_name or act.action.name or 'ERROR 146')
+						:gsub('${numb}', numb or 'ERROR 147')
+						:gsub('${actor}\'s', gFuncs.ColorIt(act.actor.name, gProfileColor[act.actor.owner or act.actor.type]) .. '\'s' .. act.actor.owner_name)
+						:gsub((gProfileSettings.mode.simplify and '${target}' or '${actor}'), gFuncs.ColorIt(act.actor.name, gProfileColor[act.actor.owner or act.actor.type]) .. act.actor.owner_name)
+						:gsub('${target}\'s', targ)
+						:gsub((gProfileSettings.mode.simplify and '${actor}' or '${target}'), targ)
+						:gsub('${lb}', '\7')
+						:gsub('${number}', m.spike_effect_param)
+						:gsub('${status}', m.spike_effect_status or 'ERROR 150'),
+					m.spike_effect_message
+				)
+
+				if not ShouldSkipDuplicateAction(act, v.target[1], m, 'spike') then
+					AshitaCore:GetChatManager():AddChatMessage(color, false, spike_effect_message)
+				end
+
+				if not non_block_messages:contains(m.spike_effect_message) then
+					m.spike_effect_message = 0
+				end
             end
         end
     end
@@ -848,8 +911,8 @@ actionhandlers.ActorParse = function (actor_id)
     local actor_name, typ, dmg, owner, filt, owner_name
 
     if actor_table == nil then
-        --return {name= nil, id=nil, is_npc=nil, type='debug', owner=nil, owner_name=nil, race=nil}
-        return {name= ('{Debug ID: %s}'):fmt(actor_id), id= '{DebugID}', is_npc= true, type= 'debug', damage= 'otherdmg', filter= 'others', owner= 'other', owner_name= '{Owner}', race= 0}
+        return {name= nil, id=nil, is_npc=nil, type='debug', owner=nil, owner_name=nil, race=nil}
+        --return {name= ('{Debug ID: %s}'):fmt(actor_id), id= '{DebugID}', is_npc= true, type= 'debug', damage= 'otherdmg', filter= 'others', owner= 'other', owner_name= '{Owner}', race= 0}
     end
 
     local ActorIsNpc = bit.band(actor_table.SpawnFlags, 0x1) == 0
@@ -873,16 +936,23 @@ actionhandlers.ActorParse = function (actor_id)
     if not filt then
         if ActorIsNpc then
             if actor_table.TargetIndex > 1791 then
-                typ = 'other_pets'
-                filt = 'other_pets'
-                owner = 'other'
-                dmg = 'otherdmg'
+                -- typ = 'other_pets'
+                -- filt = 'other_pets'
+                -- owner = 'other'
+                -- dmg = 'otherdmg'
+                typ = 'mob'
+                filt = 'monsters'
+                dmg = 'mobdmg'
                 for i, v in pairs(gFuncs.GetPartyData()) do
                     if type(v) == 'table' and v.mob and v.mob.PetTargetIndex and v.mob.PetTargetIndex == actor_table.TargetIndex then
                         if i == 'p0' then
                             typ = 'my_pet'
                             filt = 'my_pet'
                             dmg = 'mydmg'
+                        else
+                            typ = 'other_pets'
+                            filt = 'other_pets'
+                            dmg = 'otherdmg'
                         end
                         owner = i
                         owner_name = gProfileSettings.mode.showpetownernames and ' ('..gFuncs.ColorIt(v.mob.Name, gProfileColor[owner or typ])..') '
@@ -892,6 +962,10 @@ actionhandlers.ActorParse = function (actor_id)
                             typ = 'my_fellow'
                             filt = 'my_fellow'
                             dmg = 'mydmg'
+                        else
+                            typ = 'other_pets'
+                            filt = 'other_pets'
+                            dmg = 'otherdmg'
                         end
                         owner = i
                         owner_name = gProfileSettings.mode.showpetownernames and ' ('..gFuncs.ColorIt(v.mob.Name, gProfileColor[owner or typ])..') '
@@ -1032,8 +1106,8 @@ actionhandlers.SpellParse = function (act)
                 spell.data = get_weapon_skill[abil_ID]
             end
             if spell.data then
-                spell.name = gFuncs.ColorIt(spell.data.Name[gProfileSettings.lang.object], act.actor.type == 'mob' and gProfileColor.mobwscol or gProfileColor.wscol)
-                spell.weapon_skill = gFuncs.ColorIt(spell.data.Name[gProfileSettings.lang.object], act.actor.type == 'mob' and gProfileColor.mobwscol or gProfileColor.wscol)
+                spell.name = gFuncs.ColorIt(spell.data.Name[gProfileSettings.lang.object]:gsub('[^%w :-\'\",.;<>?]', ''), act.actor.type == 'mob' and gProfileColor.mobwscol or gProfileColor.wscol)
+                spell.weapon_skill = gFuncs.ColorIt(spell.data.Name[gProfileSettings.lang.object]:gsub('[^%w :-\'\",.;<>?]', ''), act.actor.type == 'mob' and gProfileColor.mobwscol or gProfileColor.wscol)
             end
         elseif msg_ID == 303 then
             spell.data = get_job_ability[74] -- Divine Seal
