@@ -10,7 +10,7 @@ local packethandlers = {};
 -- trying to identify possible dupes
 local last_chunk_buffer;
 local reference_buffer = T{};
-function check_duplicates(e)
+function record_packets(e)
     if ffi.C.memcmp(e.data_raw, e.chunk_data_raw, e.size) == 0 then
         if #reference_buffer > 2 then
             reference_buffer[#reference_buffer] = nil
@@ -30,16 +30,22 @@ function check_duplicates(e)
             offset = offset + size;
         end
     end
+	end
 
-    local packet = struct.unpack('c' .. e.size, e.data, 1)
-    for _, chunk in ipairs(reference_buffer) do
-        for _, bufferEntry in ipairs(chunk) do
-            if packet == bufferEntry then
-                e.blocked = true
-                return true
-            end
-        end
-    end
+	function check_duplicates(e, block_packet)
+		local packet = struct.unpack('c' .. e.size, e.data, 1)
+
+		for _, chunk in ipairs(reference_buffer) do
+			for _, bufferEntry in ipairs(chunk) do
+				if packet == bufferEntry then
+					if block_packet then
+						e.blocked = true
+					end
+					return true
+				end
+			end
+		end
+
     return false
 end
 
@@ -88,11 +94,22 @@ packethandlers.HandleIncoming0x28 = function(e)
 end
 
 packethandlers.HandleIncomingPacket = function(e)
+	record_packets(e)
 	if (e.id == 0x00A) then
 		gPacketHandlers.HandleIncoming0x00A(e);
-    elseif (e.id == 0x28) then
-        if check_duplicates(e) then return end
-        e.data_modified = gPacketHandlers.HandleIncoming0x28(e);
+	elseif (e.id == 0x28) then
+    -- Do not block action packets.
+    -- Just skip duplicate SimpleLog parsing.
+    --local is_duplicate = check_duplicates(e, false)
+    --local act = gActionHandlers.StringToAct(e.data)
+
+    -- Allow duplicate weapon skill action packets through,
+    -- because otherwise WS damage can disappear from SimpleLog.
+    --if is_duplicate and act.category ~= 3 then
+        --return
+    --end
+
+    e.data_modified = gPacketHandlers.HandleIncoming0x28(e);
     end
 
 ------- ITEM QUANTITY -------
@@ -131,7 +148,8 @@ packethandlers.HandleIncomingPacket = function(e)
 
 ------- ACTION MESSAGE -------
     elseif e.id == 0x29 then
-        if check_duplicates(e) then return end
+    -- Action message duplicates are safer to block.
+    if check_duplicates(e, true) then return end
 
         local am = {}
         am.actor_id = struct.unpack('I', e.data, 0x05)
@@ -158,7 +176,7 @@ packethandlers.HandleIncomingPacket = function(e)
         -- Filter these messages
         if not gFuncs.CheckFilter(actor, target, 0, am.message_id) then e.blocked = true end
 
-        if not actor or not target or e.blocked then -- If the actor or target table is nil or the packet should be blocked, ignore the packet
+        if not actor or not target or e.blocked then -- If the actor or target table is nil or the packet is blocked, ignore the packet
         elseif am.message_id == 800 then -- Spirit bond message
             local status = gFuncs.ColorIt(AshitaCore:GetResourceManager():GetString('buffs.names', am.param_1, gProfileSettings.lang.internal), gProfileColor.statuscol)
             local targ = gFuncs.ColorIt(target.name or '', gProfileColor[target.owner or target.type])
@@ -320,8 +338,10 @@ packethandlers.HandleIncomingPacket = function(e)
     elseif e.id == 0x030 and gProfileSettings.mode.crafting then
         local target = GetEntity(AshitaCore:GetMemoryManager():GetTarget():GetTargetIndex(0))
         local target_id = AshitaCore:GetMemoryManager():GetTarget():GetServerId(0)
-
-        if Self.ServerId == struct.unpack('I', e.data, 5) or target_id == struct.unpack('I', e.data, 5) then
+        if not Self then
+            gPacketHandlers.DelayedSelfAssign:once(1)
+        end
+        if Self and Self.ServerId == struct.unpack('I', e.data, 5) or target_id == struct.unpack('I', e.data, 5) then
             local crafter_name = (Self.ServerId == struct.unpack('I', e.data, 5) and Self.Name) or target.Name
             local result = e.data:byte(13)
             if result == 0 then
