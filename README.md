@@ -1,7 +1,8 @@
 # SimpleLog
 Battlemod created by Byrth  
 Ported to Ashita by Spiken  
-Combat and Message log parser for Ashita v4  
+Combat and Message log parser for Ashita v4
+Update for HorizonXI
 
 # Features
 - Custom chat messages
@@ -14,8 +15,14 @@ Combat and Message log parser for Ashita v4
 # Commands
 - **/simplelog** or **/slog** - Calls the configuration menu.
 
-# Planned features
-- Removal of Windower Resource files
+# Changes
+- Removed duplicate suppression at the packet level for incoming 0x28 action packets.
+- Added duplicate suppression at the message output level.
+- Fixes missing:
+    Weapon Skill damage
+    Spell messages
+    Job Ability messages
+    Combat animations
 
 # Credits
 - Original Battlemod is a creation of Byrth
