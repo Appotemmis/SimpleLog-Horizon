@@ -203,7 +203,7 @@ ui.render_config = function(toggle)
     imgui.PushStyleColor(ImGuiCol_WindowBg , theme.window_bg)
     imgui.PushStyleColor(ImGuiCol_TitleBg, theme.child_bg)
     if imgui.Begin(('SimpleLog - v%s'):fmt(addon.version), ui.state.open) then
-        imgui.PopStyleColor(2)
+        imgui.PushTextWrapPos(0)
         imgui.BeginGroup()
             if ui.state.tab == 0 then
                 imgui.PushStyleColor(ImGuiCol_Button, theme.button_tab_act_col)
@@ -250,27 +250,23 @@ ui.render_config = function(toggle)
                 imgui.SetTooltip('Chat log color settings')
             end
             imgui.PushStyleColor(ImGuiCol_ChildBg, theme.child_bg)
-			if ashita.interface_version >= 4.30 then
-				imgui.BeginChild('conf_box', { imgui.GetWindowWidth() - 16, imgui.GetWindowHeight() - 120 }, ImGuiChildFlags_Borders, 0)
-			else
-				imgui.BeginChild('conf_box', { imgui.GetWindowWidth() - 16, imgui.GetWindowHeight() - 120 }, true)
-			end
-                imgui.PopStyleColor()
+            local childValue = (ashita.interface_version >= 4.30) and ImGuiChildFlags_Borders or true;
+            if imgui.BeginChild('conf_box##simplelog_config_box', { imgui.GetWindowWidth()-16, imgui.GetWindowHeight()-120 }, childValue) then
+                imgui.PushTextWrapPos(0)
                 if ui.state.tab == 0 then
                     local lang_choices = {'English', 'Japanese'}
 
                     -- Language support yet not fully implemented
-                    imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'Language Option:\nSwitch between English or Japanese message outputs.')
                     -- Temp Warning
                     imgui.TextColored({1.0, 0.0, 0.0, 1.0}, 'EXPERIMENTAL')
-                    if imgui.BeginCombo('', lang_choices[gProfileSettings.lang.object]) then
-                        if imgui.Selectable('English', choice == 1) then
+                    if imgui.BeginCombo('##language_select', lang_choices[gProfileSettings.lang.object]) then
+                        if imgui.Selectable('English', gProfileSettings.lang.msg_text == 'en') then
                             gProfileSettings.lang.object = 1
                             gProfileSettings.lang.internal = 2
                             gProfileSettings.lang.msg_text = 'en'
                         end
-                        if imgui.Selectable('Japanese', choice == 2) then
+                        if imgui.Selectable('Japanese', gProfileSettings.lang.msg_text == 'jp') then
                             gProfileSettings.lang.object = 2
                             gProfileSettings.lang.internal = 1
                             gProfileSettings.lang.msg_text = 'jp'
@@ -278,17 +274,23 @@ ui.render_config = function(toggle)
                         imgui.EndCombo()
                     end
 
-                    imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'General Options:\nChange different modes of how the addon output messages.')
-                    if imgui.TreeNodeEx('Condese Options', ImGuiTreeNodeFlags_Framed and ImGuiTreeNodeFlags_DefaultOpen and ImGuiTreeNodeFlags_NoTreePushOnOpen ) then
+                    if imgui.TreeNodeEx('Condese Options', bit.bor(ImGuiTreeNodeFlags_Framed, ImGuiTreeNodeFlags_DefaultOpen)) then
+                        imgui.PushTextWrapPos(0)
                         local simplify_change = imgui.Checkbox('##simplify', {gProfileSettings.mode.simplify})
                         if simplify_change then
                             gProfileSettings.mode.simplify = not gProfileSettings.mode.simplify
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Simplify')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Condense battle text into shorter custom messages.')
+                        local debug_messages_change = imgui.Checkbox('##debug_messages', {gProfileSettings.mode.show_debug_messages or false});
+                        if debug_messages_change then
+                            gProfileSettings.mode.show_debug_messages = not gProfileSettings.mode.show_debug_messages;
+                        end
+                        imgui.SameLine()
+                        imgui.TextColored(theme.header_text_col, 'Debug Messages')
+                        imgui.TextColored(theme.desc_text_col, 'Show debug messages when targets fail to resolve.')
 
                         imgui.NewLine()
                         local condensetargets_change = imgui.Checkbox('##condensetargets', {gProfileSettings.mode.condensetargets})
@@ -297,8 +299,8 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Condense Targets')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Condense the damage into a single digit.')
+
 
                         if gProfileSettings.mode.condensetargets then
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -309,7 +311,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Target Number')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Shows the number of condensed targets.')
 
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -320,7 +321,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Condense Target Name')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Condenses the the different target names into one.')
 
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -331,7 +331,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Oxford Comma')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Allows oxford comma.')
 
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -342,7 +341,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Comma Mode')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Comma-only mode.')
                         end
 
@@ -353,7 +351,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Condense Damage')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Condense the damage into a single digit.')
 
                         if gProfileSettings.mode.condensedamage then
@@ -365,7 +362,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Swing Number')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Display the number of hits.')
 
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -376,7 +372,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Sum Damage')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Condese the number of damage, otherwise separed by comma.')
 
                             imgui.TextColored(theme.header_text_col, '\xef\x8c\x8b')
@@ -387,19 +382,20 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Condense Crits')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Condese the number of critical damage, otherwise separed by comma.')
                         end
+                        imgui.PopTextWrapPos();
+                        imgui.TreePop();
                     end
 
-                    if imgui.TreeNodeEx('Visbility Options', ImGuiTreeNodeFlags_Framed and ImGuiTreeNodeFlags_NoTreePushOnOpen ) then
+                    if imgui.TreeNodeEx('Visibility Options', ImGuiTreeNodeFlags_Framed) then
+                        imgui.PushTextWrapPos(0)
                         local cancelmultimsg_change = imgui.Checkbox('##cancelmultimsg', {gProfileSettings.mode.cancelmultimsg})
                         if cancelmultimsg_change then
                             gProfileSettings.mode.cancelmultimsg = not gProfileSettings.mode.cancelmultimsg
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Cancel Multiple Messages')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Blocks the spam of identical messages.')
 
                         imgui.NewLine()
@@ -409,7 +405,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Show Pet Owner Names')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Shows the name of pet Owners in messages.')
 
                         imgui.NewLine()
@@ -419,7 +414,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Crafting')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays early message of Crafting results.')
 
                         imgui.NewLine()
@@ -429,7 +423,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Show Blocks')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays block messages.')
 
                         imgui.NewLine()
@@ -439,7 +432,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Show Guards')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays guard messages.')
 
                         imgui.NewLine()
@@ -449,7 +441,6 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Show Critical Weapon Skill')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays critical Weapon Skill messages.')
 
                         imgui.NewLine()
@@ -459,11 +450,11 @@ ui.render_config = function(toggle)
                         end
                         imgui.SameLine()
                         imgui.TextColored(theme.header_text_col, 'Show Roll Info')
-                        imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays Corsair Roll info messages.')
+                        imgui.PopTextWrapPos();
+                        imgui.TreePop()
                     end
                 elseif ui.state.tab == 1 then
-                    imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'Profile: ')
                     imgui.SameLine()
                     imgui.TextColored(theme.button_create_filt, gStatus.CurrentFilters)
@@ -475,9 +466,10 @@ ui.render_config = function(toggle)
                         local shortFileName = jobFiltersFile:match("[^\\]*.$");
 
                         if (not ashita.fs.exists(jobFiltersFile)) then
-                            gFileTools.CreateNewProfile(jobFiltersFile, 'filters');
+			                local sourceFile = ('%saddons\\simplelog\\filters.lua'):fmt(AshitaCore:GetInstallPath());
+                            gFileTools.CopyFile(sourceFile, jobFiltersFile, false);
                             print(chat.header('SimpleLog') .. chat.message('Created filters profile: ') .. chat.color1(2, shortFileName));
-                            gStatus.LoadProfile(jobFiltersFile, 'filters');
+                            gStatus.LoadFilters();
                         elseif (ashita.fs.exists(jobFiltersFile)) then
                             imgui.OpenPopup('###file_man')
                         end
@@ -507,9 +499,10 @@ ui.render_config = function(toggle)
                             local jobFiltersFile = (gStatus.SettingsFolder .. '%s.lua'):fmt(AshitaCore:GetResourceManager():GetString("jobs.names_abbr", gStatus.PlayerJob));
                             local shortFileName = jobFiltersFile:match("[^\\]*.$");
 
-                            gFileTools.OverwriteProfile(jobFiltersFile, defaultFiltersFile)
-                            print(chat.header('SimpleLog') .. chat.message('Recreated filters profile: ') .. chat.color1(2, shortFileName));
-                            gStatus.LoadProfile(jobFiltersFile, 'filters');
+                            if gFileTools.CopyFile(defaultFiltersFile, jobFiltersFile, true) then
+                                print(chat.header('SimpleLog') .. chat.message('Recreated filters profile: ') .. chat.color1(2, shortFileName));
+                            end
+                            gStatus.LoadFilters();
                             imgui.CloseCurrentPopup()
                         end
                         imgui.SameLine()
@@ -527,7 +520,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Player: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all Player messages')
 
                             local player_checkboxes = {}
@@ -559,7 +551,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Party: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all Party messages')
 
                             local party_checkboxes = {}
@@ -583,7 +574,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Alliance: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all Alliance messages')
 
                             local alliance_checkboxes = {}
@@ -607,7 +597,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'My Pet: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all messages from your Pet')
 
                             local my_pet_checkboxes = {}
@@ -632,7 +621,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Others: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all messages from others')
 
                             local others_checkboxes = {}
@@ -656,7 +644,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'My Fellow: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all messages from your Fellows')
 
                             local my_fellow_checkboxes = {}
@@ -680,7 +667,6 @@ ui.render_config = function(toggle)
                             end
                             imgui.SameLine()
                             imgui.TextColored(theme.header_text_col, 'Other Pets: All Messages')
-                            imgui.PushTextWrapPos(0)
                             imgui.TextColored(theme.desc_text_col, 'Filter all messages from other Pets')
 
                             local other_pets_checkboxes = {}
@@ -712,9 +698,7 @@ ui.render_config = function(toggle)
                                     gProfileFilter.enemies[v_int].all = not gProfileFilter.enemies[v_int].all
                                 end
                                 imgui.SameLine()
-                                imgui.PushTextWrapPos(0)
                                 imgui.TextColored(theme.header_text_col, filter_info.filter_header.enemies[i])
-                                imgui.PushTextWrapPos(0)
                                 imgui.TextColored(theme.desc_text_col, filter_info.filter_descriptions.enemies[i])
                                 if not gProfileFilter.enemies[v_int].all then
                                     for n, m in ipairs(filter_info.filter_order) do
@@ -747,9 +731,7 @@ ui.render_config = function(toggle)
                                     gProfileFilter.monsters[v_int].all = not gProfileFilter.monsters[v_int].all
                                 end
                                 imgui.SameLine()
-                                imgui.PushTextWrapPos(0)
                                 imgui.TextColored(theme.header_text_col, filter_info.filter_header.monsters[i])
-                                imgui.PushTextWrapPos(0)
                                 imgui.TextColored(theme.desc_text_col, filter_info.filter_descriptions.monsters[i])
                                 if not gProfileFilter.monsters[v_int].all then
                                     for n, m in ipairs(filter_info.filter_order) do
@@ -772,9 +754,7 @@ ui.render_config = function(toggle)
                     end
                 elseif ui.state.tab == 2 then
                     imgui.TextColored(theme.desc_text_col, 'Colors:')
-                    imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'Colors are customizable based on party / alliance position. Use the colortest button to view the available colors.')
-                    imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'If you wish for a color to be unchanged from its normal color, set it to 0.')
                     imgui.PushStyleColor(ImGuiCol_Button, theme.button_test_colors)
                     imgui.PushStyleColor(ImGuiCol_ButtonHovered, theme.button_hov_col)
@@ -819,7 +799,10 @@ ui.render_config = function(toggle)
                         imgui.TextColored(theme.header_text_col, color_info.color_name[i])
                     end
                 end
+                imgui.PopTextWrapPos();
+            end
             imgui.EndChild()
+            imgui.PopStyleColor()
             if imgui.Button('\xef\x95\xaf Save Changes', {imgui.GetWindowWidth()-16, 20}) then
                 if not static_config then
                     ui.save_changes()
@@ -830,8 +813,10 @@ ui.render_config = function(toggle)
             imgui.TextDisabled(('\xef\x83\x81 %s'):fmt(addon.link))
             imgui.TextDisabled(('\xef\x87\xb9 2022 by %s'):fmt(addon.author))
         imgui.EndGroup()
+        imgui.PopTextWrapPos()
     end
     imgui.End()
+    imgui.PopStyleColor(2)
 end
 
 ui.updatecolors = function ()
