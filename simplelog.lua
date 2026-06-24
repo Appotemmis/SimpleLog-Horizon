@@ -21,7 +21,7 @@
 
 addon.name      = 'simplelog';
 addon.author    = 'Created by Byrth, Ported by Spiken, Updated by Bee, Amended by Artoo for Horizon';
-addon.version   = '1.1.2';
+addon.version   = '1.1.3';
 addon.desc      = 'Combat log Parser';
 addon.link      = 'https://github.com/Spike2D/SimpleLog';
 
