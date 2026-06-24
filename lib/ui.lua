@@ -462,7 +462,6 @@ ui.render_config = function(toggle)
                         imgui.PushTextWrapPos(0)
                         imgui.TextColored(theme.desc_text_col, 'Displays Corsair Roll info messages.')
                     end
-                    imgui.TreePop(2)
                 elseif ui.state.tab == 1 then
                     imgui.PushTextWrapPos(0)
                     imgui.TextColored(theme.desc_text_col, 'Profile: ')
