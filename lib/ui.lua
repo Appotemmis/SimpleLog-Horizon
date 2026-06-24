@@ -250,8 +250,11 @@ ui.render_config = function(toggle)
                 imgui.SetTooltip('Chat log color settings')
             end
             imgui.PushStyleColor(ImGuiCol_ChildBg, theme.child_bg)
-            local childValue = (ashita.interface_version >= 4.30) and ImGuiChildFlags_Borders or true;
-            imgui.BeginChild('conf_box', { imgui.GetWindowWidth()-16, imgui.GetWindowHeight()-120 }, childValue)
+			if ashita.interface_version >= 4.30 then
+				imgui.BeginChild('conf_box', { imgui.GetWindowWidth() - 16, imgui.GetWindowHeight() - 120 }, ImGuiChildFlags_Borders, 0)
+			else
+				imgui.BeginChild('conf_box', { imgui.GetWindowWidth() - 16, imgui.GetWindowHeight() - 120 }, true)
+			end
                 imgui.PopStyleColor()
                 if ui.state.tab == 0 then
                     local lang_choices = {'English', 'Japanese'}
